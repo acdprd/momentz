@@ -3,6 +3,8 @@ package com.bolaware.viewstimerstory
 import android.content.Context
 import android.support.annotation.DrawableRes
 import android.support.constraint.ConstraintLayout
+import android.view.GestureDetector
+import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -10,39 +12,35 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.VideoView
 import kotlinx.android.synthetic.main.progress_story_view.view.*
-import android.view.GestureDetector
-import android.view.GestureDetector.SimpleOnGestureListener
-import java.lang.Exception
 
 
-class Momentz : ConstraintLayout {
+open class Momentz : ConstraintLayout {
     private var currentlyShownIndex = 0
     private lateinit var currentView: View
     private var momentzViewList: List<MomentzView>
     private var libSliderViewList = mutableListOf<MyProgressBar>()
-    private var momentzCallback : MomentzCallback
+    private var momentzCallback: MomentzCallback
     private lateinit var view: View
     private val passedInContainerView: ViewGroup
-    private var mProgressDrawable : Int = R.drawable.green_lightgrey_drawable
-    private var pausedState : Boolean = false
-    lateinit var gestureDetector: GestureDetector
+    private var mProgressDrawable: Int = R.drawable.green_lightgrey_drawable
+    private var pausedState: Boolean = false
+    var touchListener: OnTouchListener? = null
+    var gestureDetector: GestureDetector? = null
 
     constructor(
         context: Context,
         momentzViewList: List<MomentzView>,
         passedInContainerView: ViewGroup,
         momentzCallback: MomentzCallback,
-        @DrawableRes mProgressDrawable : Int = R.drawable.green_lightgrey_drawable
+        @DrawableRes mProgressDrawable: Int = R.drawable.green_lightgrey_drawable
     ) : super(context) {
         this.momentzViewList = momentzViewList
         this.momentzCallback = momentzCallback
         this.passedInContainerView = passedInContainerView
         this.mProgressDrawable = mProgressDrawable
-        initView()
-        init()
     }
 
-    private fun init() {
+    open fun init() {
         momentzViewList.forEachIndexed { index, sliderView ->
             val myProgressBar = MyProgressBar(
                 context,
@@ -54,79 +52,85 @@ class Momentz : ConstraintLayout {
                         next()
                     }
                 },
-                mProgressDrawable)
+                mProgressDrawable
+            )
             libSliderViewList.add(myProgressBar)
             view.linearProgressIndicatorLay.addView(myProgressBar)
         }
         //start()
     }
 
-    fun callPause(pause : Boolean){
+    open fun callPause(pause: Boolean) {
         try {
-            if(pause){
-                if(!pausedState){
+            if (pause) {
+                if (!pausedState) {
                     this.pausedState = !pausedState
                     pause(false)
                 }
             } else {
-                if(pausedState){
+                if (pausedState) {
                     this.pausedState = !pausedState
                     resume()
                 }
             }
-        }catch (e : Exception){
+        } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun initView() {
+    open fun make() {
+        initView()
+        init()
+    }
+
+    open fun initView() {
         view = View.inflate(context, R.layout.progress_story_view, this)
         val params = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.MATCH_PARENT
         )
+        touchListener ?: let {
+            if (gestureDetector == null) {
+                gestureDetector = GestureDetector(context, SingleTapConfirm())
+            }
+            touchListener = object : OnTouchListener {
+                override fun onTouch(v: View?, event: MotionEvent?): Boolean {
+                    if (gestureDetector!!.onTouchEvent(event)) {
+                        // single tap
+                        if (x > resources.displayMetrics.widthPixels / 2) next()
+                        else prev()
+                        return true
+                    } else {
+                        // your code for move and drag
+                        when (event?.action) {
+                            MotionEvent.ACTION_DOWN -> {
+                                callPause(true)
+                                return true
+                            }
 
-        gestureDetector = GestureDetector(context, SingleTapConfirm())
-
-        val touchListener = object  : OnTouchListener{
-            override fun onTouch(v: View?, event: MotionEvent?): Boolean {
-                if (gestureDetector.onTouchEvent(event)) {
-                    // single tap
-                    if(v?.id == view.rightLay.id){
-                        next()
-                    } else if(v?.id == view.leftLay.id){
-                        prev()
-                    }
-                    return true
-                } else {
-                    // your code for move and drag
-                    when(event?.action){
-                        MotionEvent.ACTION_DOWN -> {
-                            callPause(true)
-                            return true
+                            MotionEvent.ACTION_UP -> {
+                                callPause(false)
+                                return true
+                            }
+                            else -> return false
                         }
-
-                        MotionEvent.ACTION_UP -> {
-                            callPause(false)
-                            return true
-                        }
-                        else -> return false
                     }
                 }
             }
         }
 
+
 //        view.leftLay.setOnClickListener { prev() }
 //        view.rightLay.setOnClickListener { next() }
-        view.leftLay.setOnTouchListener(touchListener)
-        view.rightLay.setOnTouchListener(touchListener)
-        //view.container.setOnTouchListener(touchListener)
+//        view.leftLay.setOnTouchListener(touchListener)
+//        view.rightLay.setOnTouchListener(touchListener)
+        view.container.setOnTouchListener(touchListener)
 
         this.layoutParams = params
         passedInContainerView.addView(this)
     }
 
-    fun show() {
+    open fun show() {
         view.loaderProgressbar.visibility = View.GONE
         if (currentlyShownIndex != 0) {
             for (i in 0..Math.max(0, currentlyShownIndex - 1)) {
@@ -136,7 +140,7 @@ class Momentz : ConstraintLayout {
         }
 
         if (currentlyShownIndex != libSliderViewList.size - 1) {
-            for (i in currentlyShownIndex + 1..libSliderViewList.size - 1) {
+            for (i in currentlyShownIndex + 1 until libSliderViewList.size) {
                 libSliderViewList[i].progress = 0
                 libSliderViewList[i].cancelProgress()
             }
@@ -155,48 +159,48 @@ class Momentz : ConstraintLayout {
             LayoutParams.MATCH_PARENT, 1f
         )
         //params.gravity = Gravity.CENTER_VERTICAL
-        if(currentView is ImageView) {
+        if (currentView is ImageView) {
             (currentView as ImageView).scaleType = ImageView.ScaleType.FIT_CENTER
             (currentView as ImageView).adjustViewBounds = true
         }
         currentView.layoutParams = params
     }
 
-    fun start() {
+    open fun start() {
 //            Handler().postDelayed({
 //                show()
 //            }, 2000)
         show()
     }
 
-    fun editDurationAndResume(index: Int, newDurationInSecons : Int){
+    open fun editDurationAndResume(index: Int, newDurationInSecons: Int) {
         view.loaderProgressbar.visibility = View.GONE
         libSliderViewList[index].editDurationAndResume(newDurationInSecons)
     }
 
-    fun pause(withLoader : Boolean) {
-        if(withLoader){
+    open fun pause(withLoader: Boolean) {
+        if (withLoader) {
             view.loaderProgressbar.visibility = View.VISIBLE
         }
         libSliderViewList[currentlyShownIndex].pauseProgress()
-        if(momentzViewList[currentlyShownIndex].view is VideoView){
+        if (momentzViewList[currentlyShownIndex].view is VideoView) {
             (momentzViewList[currentlyShownIndex].view as VideoView).pause()
         }
     }
 
-    fun resume() {
+    open fun resume() {
         view.loaderProgressbar.visibility = View.GONE
         libSliderViewList[currentlyShownIndex].resumeProgress()
-        if(momentzViewList[currentlyShownIndex].view is VideoView){
+        if (momentzViewList[currentlyShownIndex].view is VideoView) {
             (momentzViewList[currentlyShownIndex].view as VideoView).start()
         }
     }
 
-    private fun stop() {
+    open fun stop() {
 
     }
 
-    fun next() {
+    open fun next() {
         try {
             if (currentView == momentzViewList[currentlyShownIndex].view) {
                 currentlyShownIndex++
@@ -211,7 +215,7 @@ class Momentz : ConstraintLayout {
         }
     }
 
-    private fun finish() {
+    open fun finish() {
         momentzCallback.done()
         for (progressBar in libSliderViewList) {
             progressBar.cancelProgress()
@@ -219,7 +223,7 @@ class Momentz : ConstraintLayout {
         }
     }
 
-    fun prev() {
+    open fun prev() {
         try {
             if (currentView == momentzViewList[currentlyShownIndex].view) {
                 currentlyShownIndex--
