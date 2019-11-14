@@ -7,12 +7,12 @@ import android.support.annotation.DrawableRes
 import android.support.v4.content.ContextCompat
 import android.widget.LinearLayout
 import android.widget.ProgressBar
-import toPixel
+import com.bolaware.viewstimerstory.utils.toPixel
 
 class MyProgressBar : ProgressBar {
     var durationInSeconds: Int = 0
     private var index: Int = 0
-    private var objectAnimator = ObjectAnimator.ofInt(this, "progress", this.progress, 100)
+    private var objectAnimator = ObjectAnimator.ofInt(this, "progress", this.progress, MAX_PROGRESS)
     private var hasStarted: Boolean = false
     private val timeWatcher: ProgressTimeWatcher
     private var mProgressDrawable : Int = R.drawable.green_lightgrey_drawable
@@ -33,16 +33,17 @@ class MyProgressBar : ProgressBar {
     private fun initView() {
 
         val params = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
+            /*LinearLayout.LayoutParams.MATCH_PARENT*/0,
             LinearLayout.LayoutParams.WRAP_CONTENT, 1f
         )
 
-        params.marginEnd = 5f.toPixel(context)
+        params.marginStart = 2f.toPixel(context)
+        params.marginEnd = 2f.toPixel(context)
 
         //val progressBar = MyProgressBar(context, durationInSeconds * 1000)
         // textView.text = label.trim()
 
-        this.max = 100
+        this.max = MAX_PROGRESS
 
         this.progress = 0
 
@@ -81,6 +82,7 @@ class MyProgressBar : ProgressBar {
     fun cancelProgress() {
         objectAnimator.apply {
             cancel()
+            removeAllListeners()
         }
     }
 
@@ -98,9 +100,13 @@ class MyProgressBar : ProgressBar {
         }
     }
 
-    fun editDurationAndResume(newDurationInSecons: Int){
-        this.durationInSeconds = newDurationInSecons
+    fun editDurationAndResume(newDurationInSeconds: Int){
+        this.durationInSeconds = newDurationInSeconds
         cancelProgress()
         startProgress()
+    }
+
+    companion object {
+        const val MAX_PROGRESS = 1000
     }
 }

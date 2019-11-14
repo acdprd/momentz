@@ -3,6 +3,7 @@ package com.bolaware.viewstimerstory
 import android.content.Context
 import android.support.annotation.DrawableRes
 import android.support.constraint.ConstraintLayout
+import android.util.Log
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
@@ -12,12 +13,15 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.VideoView
+import com.bolaware.viewstimerstory.MyProgressBar.Companion.MAX_PROGRESS
+import com.bolaware.viewstimerstory.utils.Utils
 import kotlinx.android.synthetic.main.progress_story_view.view.*
+import kotlin.math.max
 
 
 open class Momentz : ConstraintLayout {
     private var currentlyShownIndex = 0
-    private lateinit var currentView: View
+    private var currentView: View? = null
     private var momentzViewList: List<MomentzView>
     private var libSliderViewList = mutableListOf<MyProgressBar>()
     private var momentzCallback: MomentzCallback
@@ -29,11 +33,11 @@ open class Momentz : ConstraintLayout {
     var gestureDetector: GestureDetector? = null
 
     constructor(
-        context: Context,
-        momentzViewList: List<MomentzView>,
-        passedInContainerView: ViewGroup,
-        momentzCallback: MomentzCallback,
-        @DrawableRes mProgressDrawable: Int = R.drawable.green_lightgrey_drawable
+            context: Context,
+            momentzViewList: List<MomentzView>,
+            passedInContainerView: ViewGroup,
+            momentzCallback: MomentzCallback,
+            @DrawableRes mProgressDrawable: Int = R.drawable.green_lightgrey_drawable
     ) : super(context) {
         this.momentzViewList = momentzViewList
         this.momentzCallback = momentzCallback
@@ -42,18 +46,19 @@ open class Momentz : ConstraintLayout {
     }
 
     open fun init() {
+        Utils.fixRootTopPadding(view.linearProgressIndicatorLay)
         momentzViewList.forEachIndexed { index, sliderView ->
             val myProgressBar = MyProgressBar(
-                context,
-                index,
-                sliderView.durationInSeconds,
-                object : ProgressTimeWatcher {
-                    override fun onEnd(indexFinished: Int) {
-                        currentlyShownIndex = indexFinished + 1
-                        next()
-                    }
-                },
-                mProgressDrawable
+                    context,
+                    index,
+                    sliderView.durationInSeconds,
+                    object : ProgressTimeWatcher {
+                        override fun onEnd(indexFinished: Int) {
+                            currentlyShownIndex = indexFinished
+                            next()
+                        }
+                    },
+                    mProgressDrawable
             )
             libSliderViewList.add(myProgressBar)
             view.linearProgressIndicatorLay.addView(myProgressBar)
@@ -79,7 +84,7 @@ open class Momentz : ConstraintLayout {
         }
     }
 
-    open fun make():Momentz {
+    open fun make(): Momentz {
         initView()
         init()
         return this
@@ -88,9 +93,10 @@ open class Momentz : ConstraintLayout {
     open fun initView() {
         view = View.inflate(context, R.layout.progress_story_view, this)
         val params = FrameLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.MATCH_PARENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
         )
+        view.isLongClickable = true
         touchListener ?: let {
             if (gestureDetector == null) {
                 gestureDetector = GestureDetector(context, SingleTapConfirm())
@@ -120,53 +126,51 @@ open class Momentz : ConstraintLayout {
                 }
             }
         }
-
-
-//        view.leftLay.setOnClickListener { prev() }
-//        view.rightLay.setOnClickListener { next() }
-//        view.leftLay.setOnTouchListener(touchListener)
-//        view.rightLay.setOnTouchListener(touchListener)
-        view.container.setOnTouchListener(touchListener)
+        view.setOnTouchListener(touchListener)
 
         this.layoutParams = params
         passedInContainerView.addView(this)
     }
 
-    open fun show() {
+    open fun cancelProgress() {
         view.loaderProgressbar.visibility = View.GONE
         if (currentlyShownIndex != 0) {
-            for (i in 0..Math.max(0, currentlyShownIndex - 1)) {
-                libSliderViewList[i].progress = 100
+            for (i in 0..max(0, currentlyShownIndex - 1)) {
+                libSliderViewList[i].progress = MAX_PROGRESS
                 libSliderViewList[i].cancelProgress()
             }
         }
 
         if (currentlyShownIndex != libSliderViewList.size - 1) {
-            for (i in currentlyShownIndex + 1 until libSliderViewList.size) {
+            for (i in (currentlyShownIndex + 1) until libSliderViewList.size) {
                 libSliderViewList[i].progress = 0
                 libSliderViewList[i].cancelProgress()
             }
         }
+    }
 
-        currentView = momentzViewList[currentlyShownIndex].view
-
+    open fun show() {
+        cancelProgress()
+        val nextView = momentzViewList[currentlyShownIndex].view
+        val sameViewType = currentView === nextView
+        if (!sameViewType) {
+            currentView = nextView
+            view.currentlyDisplayedView.removeAllViews()
+            view.currentlyDisplayedView.addView(currentView)
+            val params = FrameLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT,
+                    LayoutParams.MATCH_PARENT
+            )
+            //params.gravity = Gravity.CENTER_VERTICAL
+            if (currentView is ImageView) {
+                (currentView as ImageView).scaleType = ImageView.ScaleType.CENTER_CROP
+//            (currentView as ImageView).adjustViewBounds = true
+            }
+            currentView?.layoutParams = params
+        }
         libSliderViewList[currentlyShownIndex].startProgress()
 
-        momentzCallback.onNextCalled(currentView, this, currentlyShownIndex)
-
-        view.currentlyDisplayedView.removeAllViews()
-        view.currentlyDisplayedView.addView(currentView)
-        val params = LinearLayout.LayoutParams(
-            LayoutParams.MATCH_PARENT,
-            LayoutParams.MATCH_PARENT,
-            1f
-        )
-        //params.gravity = Gravity.CENTER_VERTICAL
-        if (currentView is ImageView) {
-            (currentView as ImageView).scaleType = ImageView.ScaleType.CENTER_CROP
-            (currentView as ImageView).adjustViewBounds = true
-        }
-        currentView.layoutParams = params
+        momentzCallback.onNextCalled(currentView!!, this, currentlyShownIndex)
     }
 
     open fun start() {
@@ -176,12 +180,13 @@ open class Momentz : ConstraintLayout {
         show()
     }
 
-    open fun editDurationAndResume(index: Int, newDurationInSecons: Int) {
+    open fun editDurationAndResume(index: Int, newDurationInSeconds: Int) {
         view.loaderProgressbar.visibility = View.GONE
-        libSliderViewList[index].editDurationAndResume(newDurationInSecons)
+        libSliderViewList[index].editDurationAndResume(newDurationInSeconds)
     }
 
-    open fun pause(withLoader: Boolean) {
+    @JvmOverloads
+    open fun pause(withLoader: Boolean = false) {
         if (withLoader) {
             view.loaderProgressbar.visibility = View.VISIBLE
         }
@@ -199,18 +204,12 @@ open class Momentz : ConstraintLayout {
         }
     }
 
-    open fun stop() {
-
-    }
-
     open fun next() {
         try {
-            if (currentView == momentzViewList[currentlyShownIndex].view) {
-                currentlyShownIndex++
-                if (momentzViewList.size <= currentlyShownIndex) {
-                    finish()
-                    return
-                }
+            currentlyShownIndex++
+            if (momentzViewList.size <= currentlyShownIndex) {
+                finish()
+                return
             }
             show()
         } catch (e: IndexOutOfBoundsException) {
@@ -222,21 +221,26 @@ open class Momentz : ConstraintLayout {
         momentzCallback.done()
         for (progressBar in libSliderViewList) {
             progressBar.cancelProgress()
-            progressBar.progress = 100
+            progressBar.progress = MAX_PROGRESS
         }
     }
 
     open fun prev() {
         try {
-            if (currentView == momentzViewList[currentlyShownIndex].view) {
-                currentlyShownIndex--
-                if (0 > currentlyShownIndex) {
-                    currentlyShownIndex = 0
-                }
-            }
+            currentlyShownIndex = max(currentlyShownIndex - (if (currentlyShownIndex in momentzViewList.indices) 1 else 2), 0)
+//            if (0 > currentlyShownIndex) {
+//                currentlyShownIndex = 0
+//            }
+//            if (currentView == momentzViewList[currentlyShownIndex].view) {
+//                currentlyShownIndex--
+//                if (0 > currentlyShownIndex) {
+//                    currentlyShownIndex = 0
+//                }
+//            }
         } catch (e: IndexOutOfBoundsException) {
             currentlyShownIndex -= 2
         } finally {
+            cancelProgress()
             show()
         }
     }
