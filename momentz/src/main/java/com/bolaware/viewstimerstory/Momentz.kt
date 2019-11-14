@@ -8,6 +8,7 @@ import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.VideoView
@@ -78,14 +79,15 @@ open class Momentz : ConstraintLayout {
         }
     }
 
-    open fun make() {
+    open fun make():Momentz {
         initView()
         init()
+        return this
     }
 
     open fun initView() {
         view = View.inflate(context, R.layout.progress_story_view, this)
-        val params = LinearLayout.LayoutParams(
+        val params = FrameLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.MATCH_PARENT
         )
@@ -156,11 +158,12 @@ open class Momentz : ConstraintLayout {
         view.currentlyDisplayedView.addView(currentView)
         val params = LinearLayout.LayoutParams(
             LayoutParams.MATCH_PARENT,
-            LayoutParams.MATCH_PARENT, 1f
+            LayoutParams.MATCH_PARENT,
+            1f
         )
         //params.gravity = Gravity.CENTER_VERTICAL
         if (currentView is ImageView) {
-            (currentView as ImageView).scaleType = ImageView.ScaleType.FIT_CENTER
+            (currentView as ImageView).scaleType = ImageView.ScaleType.CENTER_CROP
             (currentView as ImageView).adjustViewBounds = true
         }
         currentView.layoutParams = params
