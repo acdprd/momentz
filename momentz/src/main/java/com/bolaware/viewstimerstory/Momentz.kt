@@ -3,7 +3,6 @@ package com.bolaware.viewstimerstory
 import android.content.Context
 import android.support.annotation.DrawableRes
 import android.support.constraint.ConstraintLayout
-import android.util.Log
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
@@ -17,6 +16,7 @@ import com.bolaware.viewstimerstory.MyProgressBar.Companion.MAX_PROGRESS
 import com.bolaware.viewstimerstory.utils.Utils
 import kotlinx.android.synthetic.main.progress_story_view.view.*
 import kotlin.math.max
+import kotlin.math.min
 
 
 open class Momentz : ConstraintLayout {
@@ -31,6 +31,7 @@ open class Momentz : ConstraintLayout {
     private var pausedState: Boolean = false
     var touchListener: OnTouchListener? = null
     var gestureDetector: GestureDetector? = null
+    var ifFirst: (() -> Unit)? = null
 
     constructor(
             context: Context,
@@ -45,7 +46,7 @@ open class Momentz : ConstraintLayout {
         this.mProgressDrawable = mProgressDrawable
     }
 
-    open fun init() {
+    open fun init(post: () -> Unit = {}) {
         Utils.fixRootTopPadding(view.linearProgressIndicatorLay)
         momentzViewList.forEachIndexed { index, sliderView ->
             val myProgressBar = MyProgressBar(
@@ -64,6 +65,7 @@ open class Momentz : ConstraintLayout {
             view.linearProgressIndicatorLay.addView(myProgressBar)
         }
         //start()
+        view.post(post)
     }
 
     open fun callPause(pause: Boolean) {
@@ -84,9 +86,9 @@ open class Momentz : ConstraintLayout {
         }
     }
 
-    open fun make(): Momentz {
+    open fun make(post: () -> Unit = {}): Momentz {
         initView()
-        init()
+        init(post)
         return this
     }
 
@@ -135,7 +137,7 @@ open class Momentz : ConstraintLayout {
     open fun cancelProgress() {
         view.loaderProgressbar.visibility = View.GONE
         if (currentlyShownIndex != 0) {
-            for (i in 0..max(0, currentlyShownIndex - 1)) {
+            for (i in 0..min(libSliderViewList.size - 1, max(0, currentlyShownIndex - 1))) {
                 libSliderViewList[i].progress = MAX_PROGRESS
                 libSliderViewList[i].cancelProgress()
             }
@@ -226,8 +228,12 @@ open class Momentz : ConstraintLayout {
     }
 
     open fun prev() {
-        try {
-            currentlyShownIndex = max(currentlyShownIndex - (if (currentlyShownIndex in momentzViewList.indices) 1 else 2), 0)
+        if (currentlyShownIndex == 0 && ifFirst != null) {
+            cancelProgress()
+            ifFirst?.invoke()
+        } else
+            try {
+                currentlyShownIndex = max(currentlyShownIndex - (if (currentlyShownIndex in momentzViewList.indices) 1 else 2), 0)
 //            if (0 > currentlyShownIndex) {
 //                currentlyShownIndex = 0
 //            }
@@ -237,12 +243,12 @@ open class Momentz : ConstraintLayout {
 //                    currentlyShownIndex = 0
 //                }
 //            }
-        } catch (e: IndexOutOfBoundsException) {
-            currentlyShownIndex -= 2
-        } finally {
-            cancelProgress()
-            show()
-        }
+            } catch (e: IndexOutOfBoundsException) {
+                currentlyShownIndex -= 2
+            } finally {
+                cancelProgress()
+                show()
+            }
     }
 
     private inner class SingleTapConfirm : SimpleOnGestureListener() {
